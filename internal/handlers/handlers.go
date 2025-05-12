@@ -3,6 +3,8 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 )
 
@@ -42,9 +44,15 @@ func GetHealth(res http.ResponseWriter, req *http.Request) {
 
 func GetMetrics(apiCfg *ApiConfig) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		res.Header().Add("Content-Type", "text/plain; charset=utf-8")
-		res.WriteHeader(200)
-		msg := fmt.Sprintf("Hits: %v", apiCfg.getHits())
+		path := filepath.Join("templates", "metrics.html")
+		rawTemplate, err := os.ReadFile(path)
+		if err != nil {
+			http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		msg := fmt.Sprintf(string(rawTemplate), apiCfg.getHits())
+		res.Header().Add("Content-Type", "text/html; charset=utf-8")
+		res.WriteHeader(http.StatusOK)
 		res.Write([]byte(msg))
 	}
 }

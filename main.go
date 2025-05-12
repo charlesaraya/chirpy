@@ -18,11 +18,11 @@ func main() {
 	// 2. Set up handlers
 	mux.Handle("/app/", handlers.GetHome(&apiCfg, ".", "/app"))
 
-	mux.HandleFunc("GET /health", handlers.GetHealth)
+	mux.HandleFunc("GET /api/healthz", handlers.GetHealth)
 
-	mux.HandleFunc("GET /metrics", handlers.GetMetrics(&apiCfg))
+	mux.HandleFunc("GET /admin/metrics", handlers.GetMetrics(&apiCfg))
 
-	mux.HandleFunc("POST /reset", handlers.ResetMetrics(&apiCfg))
+	mux.HandleFunc("POST /admin/reset", handlers.ResetMetrics(&apiCfg))
 
 	// 3. Start server
 	server.ListenAndServe()
