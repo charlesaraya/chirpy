@@ -26,6 +26,10 @@ func (cfg *ApiConfig) incHits(next http.Handler) http.HandlerFunc {
 	}
 }
 
+func (cfg *ApiConfig) resetHits() {
+	cfg.ServerHits = atomic.Int32{}
+}
+
 func GetHome(apiCfg *ApiConfig, name string, prefix string) http.HandlerFunc {
 	return apiCfg.incHits(http.StripPrefix(prefix, http.FileServer(http.Dir(name))))
 }
@@ -42,5 +46,12 @@ func GetMetrics(apiCfg *ApiConfig) http.HandlerFunc {
 		res.WriteHeader(200)
 		msg := fmt.Sprintf("Hits: %v", apiCfg.getHits())
 		res.Write([]byte(msg))
+	}
+}
+
+func ResetMetrics(apiCfg *ApiConfig) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		res.WriteHeader(200)
+		apiCfg.resetHits()
 	}
 }

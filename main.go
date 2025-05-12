@@ -22,6 +22,8 @@ func main() {
 
 	mux.HandleFunc("GET /metrics", handlers.GetMetrics(&apiCfg))
 
+	mux.HandleFunc("POST /metrics", handlers.ResetMetrics(&apiCfg))
+
 	// 3. Start server
 	server.ListenAndServe()
 }

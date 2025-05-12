@@ -75,4 +75,16 @@ func TestHandlers(t *testing.T) {
 		expected := fmt.Sprintf("Hits: %v", hits)
 		assertBodyEqual(t, rec, expected)
 	})
+	t.Run("run reset metrics handler", func(t *testing.T) {
+		cfg := &ApiConfig{}
+		hits := int32(42)
+		cfg.ServerHits.Store(hits)
+
+		rec := executeRequest(t, ResetMetrics(cfg), "POST", "/reset", nil)
+		assertStatus(t, rec, http.StatusOK)
+
+		rec = executeRequest(t, GetMetrics(cfg), "GET", "/metrics", nil)
+		expected := fmt.Sprintf("Hits: %v", 0)
+		assertBodyEqual(t, rec, expected)
+	})
 }
