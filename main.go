@@ -2,6 +2,8 @@ package main
 
 import (
 	"net/http"
+
+	"github.com/charlesaraya/chirpy/internal/handlers"
 )
 
 func main() {
@@ -14,6 +16,8 @@ func main() {
 
 	// Set up handlers
 	mux.Handle("/app/", http.StripPrefix("/app", http.FileServer(http.Dir("."))))
+
+	mux.HandleFunc("GET /health", handlers.GetHealth)
 
 	// Start server
 	server.ListenAndServe()
