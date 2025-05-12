@@ -45,7 +45,12 @@ func assertBodyEqual(t *testing.T, rec *httptest.ResponseRecorder, expected stri
 }
 
 func TestHandlers(t *testing.T) {
-	t.Run("run home handler", func(t *testing.T) {
+	t.Run("run health handler", func(t *testing.T) {
+		rec := executeRequest(t, GetHealth, "GET", "/health", nil)
+		assertStatus(t, rec, http.StatusOK)
+		assertBodyEqual(t, rec, HealthOK)
+	})
+	t.Run("run server hits increment", func(t *testing.T) {
 		tempDir := os.TempDir()
 		os.WriteFile(filepath.Join(tempDir, "index.html"), []byte("Ok"), 0664)
 		cfg := &ApiConfig{}
@@ -54,25 +59,9 @@ func TestHandlers(t *testing.T) {
 			executeRequest(t, GetHome(cfg, tempDir, "/app"), "GET", "/app/", nil)
 		}
 		rec := executeRequest(t, GetMetrics(cfg), "GET", "/metrics", nil)
-
-		expected := fmt.Sprintf("Hits: %v", numHits)
-		assertBodyEqual(t, rec, expected)
-	})
-	t.Run("run health handler", func(t *testing.T) {
-		rec := executeRequest(t, GetHealth, "GET", "/health", nil)
-		assertStatus(t, rec, http.StatusOK)
-		assertBodyEqual(t, rec, HealthOK)
-	})
-	t.Run("run get metrics handler", func(t *testing.T) {
-		cfg := &ApiConfig{}
-		hits := int32(42)
-		cfg.ServerHits.Store(hits)
-
-		rec := executeRequest(t, GetMetrics(cfg), "GET", "/metrics", nil)
-
 		assertStatus(t, rec, http.StatusOK)
 		assertContentType(t, rec, "text/plain; charset=utf-8")
-		expected := fmt.Sprintf("Hits: %v", hits)
+		expected := fmt.Sprintf("Hits: %v", numHits)
 		assertBodyEqual(t, rec, expected)
 	})
 	t.Run("run reset metrics handler", func(t *testing.T) {
