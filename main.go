@@ -13,12 +13,15 @@ func main() {
 		Handler: mux,
 		Addr:    ":8080",
 	}
+	apiCfg := handlers.ApiConfig{}
 
-	// Set up handlers
-	mux.Handle("/app/", http.StripPrefix("/app", http.FileServer(http.Dir("."))))
+	// 2. Set up handlers
+	mux.Handle("/app/", handlers.GetHome(&apiCfg, ".", "/app"))
 
 	mux.HandleFunc("GET /health", handlers.GetHealth)
 
-	// Start server
+	mux.HandleFunc("GET /metrics", handlers.GetMetrics(&apiCfg))
+
+	// 3. Start server
 	server.ListenAndServe()
 }
