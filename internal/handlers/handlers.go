@@ -1,15 +1,20 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sync/atomic"
 )
 
 const (
-	HealthOK string = "OK"
+	HealthOK                 string = "OK"
+	MaxChirpLen              int    = 140
+	ErrorChirpTooLong        string = "Chirp is too long"
+	ErrorSomethingWentWrong  string = "Something went wrong"
+	ErrorInternalServerError string = "Internal Server Error"
+	MetricsTemplatePath      string = "./templates/metrics.html"
 )
 
 type ApiConfig struct {
@@ -36,18 +41,63 @@ func GetHome(apiCfg *ApiConfig, name string, prefix string) http.HandlerFunc {
 	return apiCfg.incHits(http.StripPrefix(prefix, http.FileServer(http.Dir(name))))
 }
 
+func ValidateChirp(res http.ResponseWriter, req *http.Request) {
+	type reqPayload struct {
+		Body string `json:"body"`
+	}
+	type resPayload struct {
+		Error string `json:"error"`
+		Valid bool   `json:"valid"`
+	}
+	decoder := json.NewDecoder(req.Body)
+	pl := reqPayload{}
+	if err := decoder.Decode(&pl); err != nil {
+		http.Error(res, ErrorSomethingWentWrong, http.StatusBadRequest)
+		return
+	}
+	if len(pl.Body) > 0 && len(pl.Body) <= MaxChirpLen {
+		resBody := resPayload{
+			Valid: true,
+		}
+		data, err := json.Marshal(resBody)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		res.WriteHeader(http.StatusOK)
+		res.Write(data)
+	} else {
+		errorMsg := ""
+		if len(pl.Body) == 0 {
+			errorMsg = ErrorSomethingWentWrong
+		} else {
+			errorMsg = ErrorChirpTooLong
+		}
+		resBody := resPayload{
+			Error: errorMsg,
+			Valid: false,
+		}
+		data, err := json.Marshal(resBody)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		res.WriteHeader(http.StatusBadRequest)
+		res.Write(data)
+	}
+}
+
 func GetHealth(res http.ResponseWriter, req *http.Request) {
 	res.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	res.WriteHeader(200)
 	res.Write([]byte(HealthOK))
 }
 
-func GetMetrics(apiCfg *ApiConfig) http.HandlerFunc {
+func GetMetrics(apiCfg *ApiConfig, tmplPath string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		path := filepath.Join("templates", "metrics.html")
-		rawTemplate, err := os.ReadFile(path)
+		rawTemplate, err := os.ReadFile(tmplPath)
 		if err != nil {
-			http.Error(res, "Internal Server Error", http.StatusInternalServerError)
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 			return
 		}
 		msg := fmt.Sprintf(string(rawTemplate), apiCfg.getHits())

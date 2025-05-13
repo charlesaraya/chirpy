@@ -18,9 +18,11 @@ func main() {
 	// 2. Set up handlers
 	mux.Handle("/app/", handlers.GetHome(&apiCfg, ".", "/app"))
 
+	mux.HandleFunc("POST /api/validate_chirp", handlers.ValidateChirp)
+
 	mux.HandleFunc("GET /api/healthz", handlers.GetHealth)
 
-	mux.HandleFunc("GET /admin/metrics", handlers.GetMetrics(&apiCfg))
+	mux.HandleFunc("GET /admin/metrics", handlers.GetMetrics(&apiCfg, handlers.MetricsTemplatePath))
 
 	mux.HandleFunc("POST /admin/reset", handlers.ResetMetrics(&apiCfg))
 
