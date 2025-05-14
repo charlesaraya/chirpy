@@ -18,6 +18,7 @@ const (
 	ErrorChirpTooLong        string = "Chirp is too long"
 	ErrorSomethingWentWrong  string = "Something went wrong"
 	ErrorInternalServerError string = "Internal Server Error"
+	ErrorResourceNotFound    string = "Resource Not Found"
 	MetricsTemplatePath      string = "./templates/metrics.html"
 	allowedPlatform          string = "dev"
 	TimeFormat               string = "2006-01-02 15:04:05.000000"
@@ -229,6 +230,7 @@ func CreateChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
 		if err != nil {
 			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 		}
+		res.WriteHeader(http.StatusCreated)
 		res.Header().Set("Content-Type", "application/json")
 		res.Write(data)
 	}
@@ -250,6 +252,35 @@ func GetChirpsHandler(apiCfg *ApiConfig) http.HandlerFunc {
 				UserID:    chirp.UserID.String(),
 				Body:      chirp.Body,
 			}
+		}
+		data, err := json.Marshal(payload)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		res.Header().Set("Content-Type", "application/json")
+		res.Write(data)
+	}
+}
+
+func GetSingleChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		id, err := uuid.Parse(req.PathValue("chirpID"))
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		chirp, err := apiCfg.DBQueries.GetSingleChirp(req.Context(), id)
+		if err != nil {
+			http.Error(res, ErrorResourceNotFound, http.StatusNotFound)
+			return
+		}
+		payload := chirpPayload{
+			ID:        chirp.ID.String(),
+			CreatedAt: chirp.CreatedAt.Format(TimeFormat),
+			UpdatedAt: chirp.UpdatedAt.Format(TimeFormat),
+			UserID:    chirp.ID.String(),
+			Body:      chirp.Body,
 		}
 		data, err := json.Marshal(payload)
 		if err != nil {
