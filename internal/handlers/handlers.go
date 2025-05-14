@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/charlesaraya/chirpy/internal/database"
+	"github.com/google/uuid"
 )
 
 const (
@@ -184,6 +185,51 @@ func CreateUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 		}
 		res.WriteHeader(http.StatusCreated)
 		res.Header().Add("Content-Type", "application/json")
+		res.Write(data)
+	}
+}
+
+func CreateChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		type reqPayload struct {
+			UserID uuid.UUID `json:"user_id"`
+			Body   string    `json:"body"`
+		}
+		type resPayload struct {
+			ID        string `json:"id"`
+			CreatedAt string `json:"created_at"`
+			UpdatedAt string `json:"updated_at"`
+			UserID    string `json:"user_id"`
+			Body      string `json:"body"`
+		}
+		params := reqPayload{}
+		decoder := json.NewDecoder(req.Body)
+		if err := decoder.Decode(&params); err != nil {
+			http.Error(res, ErrorSomethingWentWrong, http.StatusBadRequest)
+			return
+		}
+		chirpParams := database.CreateChirpParams{
+			UserID: uuid.UUID(params.UserID),
+			Body:   params.Body,
+		}
+		chirp, err := apiCfg.DBQueries.CreateChirp(req.Context(), chirpParams)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		payload := resPayload{
+			ID:        chirp.ID.String(),
+			CreatedAt: chirp.CreatedAt.String(),
+			UpdatedAt: chirp.UpdatedAt.String(),
+			UserID:    chirp.UserID.String(),
+			Body:      chirp.Body,
+		}
+		data, err := json.Marshal(payload)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+		}
+		res.WriteHeader(http.StatusCreated)
+		res.Header().Add("Content Type:", "application/json")
 		res.Write(data)
 	}
 }

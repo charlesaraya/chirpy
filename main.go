@@ -21,6 +21,7 @@ func main() {
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
 
+	// 0. Open DB connection
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatal("Error opening the database")
@@ -42,6 +43,8 @@ func main() {
 	mux.Handle("/app/", handlers.GetHome(&apiCfg, ".", "/app"))
 
 	mux.HandleFunc("POST /api/users", handlers.CreateUserHandler(&apiCfg))
+
+	mux.HandleFunc("POST /api/chirps", handlers.CreateChirpHandler(&apiCfg))
 
 	mux.HandleFunc("POST /api/validate_chirp", handlers.ValidateChirp)
 
