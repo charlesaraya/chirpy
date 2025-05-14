@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"sync/atomic"
 )
 
@@ -16,6 +17,8 @@ const (
 	ErrorInternalServerError string = "Internal Server Error"
 	MetricsTemplatePath      string = "./templates/metrics.html"
 )
+
+var ProfaneWords = []string{"kerfuffle", "sharbert", "fornax"}
 
 type ApiConfig struct {
 	ServerHits atomic.Int32
@@ -45,9 +48,11 @@ func ValidateChirp(res http.ResponseWriter, req *http.Request) {
 	type reqPayload struct {
 		Body string `json:"body"`
 	}
-	type resPayload struct {
+	type resErrorPayload struct {
 		Error string `json:"error"`
-		Valid bool   `json:"valid"`
+	}
+	type resPayload struct {
+		CleanedBody string `json:"cleaned_body"`
 	}
 	decoder := json.NewDecoder(req.Body)
 	pl := reqPayload{}
@@ -57,7 +62,7 @@ func ValidateChirp(res http.ResponseWriter, req *http.Request) {
 	}
 	if len(pl.Body) > 0 && len(pl.Body) <= MaxChirpLen {
 		resBody := resPayload{
-			Valid: true,
+			CleanedBody: cleanProfanity(pl.Body),
 		}
 		data, err := json.Marshal(resBody)
 		if err != nil {
@@ -73,9 +78,8 @@ func ValidateChirp(res http.ResponseWriter, req *http.Request) {
 		} else {
 			errorMsg = ErrorChirpTooLong
 		}
-		resBody := resPayload{
+		resBody := resErrorPayload{
 			Error: errorMsg,
-			Valid: false,
 		}
 		data, err := json.Marshal(resBody)
 		if err != nil {
@@ -85,6 +89,23 @@ func ValidateChirp(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusBadRequest)
 		res.Write(data)
 	}
+}
+
+func cleanProfanity(chirp string) string {
+	for _, word := range ProfaneWords {
+		splitChirp := strings.Split(chirp, " ")
+		chirp = ""
+		for i, split := range splitChirp {
+			if strings.ToLower(split) == word {
+				split = "****"
+			}
+			chirp += split
+			if i >= 0 && i < len(splitChirp)-1 {
+				chirp += " "
+			}
+		}
+	}
+	return chirp
 }
 
 func GetHealth(res http.ResponseWriter, req *http.Request) {
