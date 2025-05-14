@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
+
+	"github.com/charlesaraya/chirpy/internal/database"
 )
 
 const (
@@ -22,6 +24,7 @@ var ProfaneWords = []string{"kerfuffle", "sharbert", "fornax"}
 
 type ApiConfig struct {
 	ServerHits atomic.Int32
+	DBQueries  *database.Queries
 }
 
 func (cfg *ApiConfig) getHits() int32 {
@@ -132,5 +135,45 @@ func ResetMetrics(apiCfg *ApiConfig) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(200)
 		apiCfg.resetHits()
+	}
+}
+
+func CreateUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		type reqPayload struct {
+			Email string `json:"email"`
+		}
+		type resPayload struct {
+			Id        string `json:"id"`
+			CreatedAt string `json:"created_at"`
+			UpdatedAt string `json:"updated_at"`
+			Email     string `json:"email"`
+		}
+
+		decoder := json.NewDecoder(req.Body)
+		params := reqPayload{}
+		if err := decoder.Decode(&params); err != nil {
+			http.Error(res, ErrorSomethingWentWrong, http.StatusBadRequest)
+			return
+		}
+		user, err := apiCfg.DBQueries.CreateUser(req.Context(), params.Email)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		resBody := resPayload{
+			Id:        user.ID.String(),
+			CreatedAt: user.CreatedAt.String(),
+			UpdatedAt: user.UpdatedAt.String(),
+			Email:     user.Email,
+		}
+		data, err := json.Marshal(resBody)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		res.WriteHeader(http.StatusCreated)
+		res.Header().Add("Content-Type", "application/json")
+		res.Write(data)
 	}
 }
