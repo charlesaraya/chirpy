@@ -84,7 +84,7 @@ func ValidateChirp(res http.ResponseWriter, req *http.Request) {
 			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 			return
 		}
-		res.WriteHeader(http.StatusOK)
+		res.Header().Set("Content-Type", "application/json")
 		res.Write(data)
 	} else {
 		errorMsg := ""
@@ -102,6 +102,7 @@ func ValidateChirp(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 		res.WriteHeader(http.StatusBadRequest)
+		res.Header().Set("Content-Type", "application/json")
 		res.Write(data)
 	}
 }
@@ -124,8 +125,7 @@ func cleanProfanity(chirp string) string {
 }
 
 func GetHealth(res http.ResponseWriter, req *http.Request) {
-	res.Header().Add("Content-Type", "text/plain; charset=utf-8")
-	res.WriteHeader(200)
+	res.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	res.Write([]byte(HealthOK))
 }
 
@@ -137,8 +137,7 @@ func GetMetrics(apiCfg *ApiConfig, tmplPath string) http.HandlerFunc {
 			return
 		}
 		msg := fmt.Sprintf(string(rawTemplate), apiCfg.getHits())
-		res.Header().Add("Content-Type", "text/html; charset=utf-8")
-		res.WriteHeader(http.StatusOK)
+		res.Header().Set("Content-Type", "text/html; charset=utf-8")
 		res.Write([]byte(msg))
 	}
 }
@@ -193,7 +192,7 @@ func CreateUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 			return
 		}
 		res.WriteHeader(http.StatusCreated)
-		res.Header().Add("Content-Type", "application/json")
+		res.Header().Set("Content-Type", "application/json")
 		res.Write(data)
 	}
 }
@@ -230,8 +229,7 @@ func CreateChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
 		if err != nil {
 			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 		}
-		res.WriteHeader(http.StatusCreated)
-		res.Header().Add("Content Type:", "application/json")
+		res.Header().Set("Content-Type", "application/json")
 		res.Write(data)
 	}
 }
