@@ -20,6 +20,7 @@ const (
 	ErrorInternalServerError string = "Internal Server Error"
 	MetricsTemplatePath      string = "./templates/metrics.html"
 	allowedPlatform          string = "dev"
+	TimeFormat               string = "2006-01-02 15:04:05.000000"
 )
 
 var ProfaneWords = []string{"kerfuffle", "sharbert", "fornax"}
@@ -28,6 +29,14 @@ type ApiConfig struct {
 	ServerHits atomic.Int32
 	DBQueries  *database.Queries
 	Platform   string
+}
+
+type chirpPayload struct {
+	ID        string `json:"id"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+	UserID    string `json:"user_id"`
+	Body      string `json:"body"`
 }
 
 func (cfg *ApiConfig) getHits() int32 {
@@ -195,13 +204,6 @@ func CreateChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
 			UserID uuid.UUID `json:"user_id"`
 			Body   string    `json:"body"`
 		}
-		type resPayload struct {
-			ID        string `json:"id"`
-			CreatedAt string `json:"created_at"`
-			UpdatedAt string `json:"updated_at"`
-			UserID    string `json:"user_id"`
-			Body      string `json:"body"`
-		}
 		params := reqPayload{}
 		decoder := json.NewDecoder(req.Body)
 		if err := decoder.Decode(&params); err != nil {
@@ -217,10 +219,10 @@ func CreateChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
 			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 			return
 		}
-		payload := resPayload{
+		payload := chirpPayload{
 			ID:        chirp.ID.String(),
-			CreatedAt: chirp.CreatedAt.String(),
-			UpdatedAt: chirp.UpdatedAt.String(),
+			CreatedAt: chirp.CreatedAt.Format(TimeFormat),
+			UpdatedAt: chirp.UpdatedAt.Format(TimeFormat),
 			UserID:    chirp.UserID.String(),
 			Body:      chirp.Body,
 		}
@@ -230,6 +232,33 @@ func CreateChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
 		}
 		res.WriteHeader(http.StatusCreated)
 		res.Header().Add("Content Type:", "application/json")
+		res.Write(data)
+	}
+}
+
+func GetChirpsHandler(apiCfg *ApiConfig) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		chirps, err := apiCfg.DBQueries.GetChirps(req.Context())
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		payload := make([]chirpPayload, len(chirps))
+		for i, chirp := range chirps {
+			payload[i] = chirpPayload{
+				ID:        chirp.ID.String(),
+				CreatedAt: chirp.CreatedAt.Format(TimeFormat),
+				UpdatedAt: chirp.UpdatedAt.Format(TimeFormat),
+				UserID:    chirp.UserID.String(),
+				Body:      chirp.Body,
+			}
+		}
+		data, err := json.Marshal(payload)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		res.Header().Set("Content-Type", "application/json")
 		res.Write(data)
 	}
 }

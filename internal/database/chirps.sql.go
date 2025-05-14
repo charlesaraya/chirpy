@@ -49,3 +49,37 @@ func (q *Queries) DeleteChirps(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, deleteChirps)
 	return err
 }
+
+const getChirps = `-- name: GetChirps :many
+SELECT id, user_id, created_at, updated_at, body FROM chirps
+ORDER BY created_at
+`
+
+func (q *Queries) GetChirps(ctx context.Context) ([]Chirp, error) {
+	rows, err := q.db.QueryContext(ctx, getChirps)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Chirp
+	for rows.Next() {
+		var i Chirp
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Body,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
