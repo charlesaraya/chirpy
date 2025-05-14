@@ -19,14 +19,17 @@ func main() {
 		fmt.Print("Error loading .env file")
 	}
 	dbURL := os.Getenv("DB_URL")
+	platform := os.Getenv("PLATFORM")
 
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatal("Error opening the database")
 	}
 	dbQueries := database.New(db)
+
 	apiCfg := handlers.ApiConfig{
 		DBQueries: dbQueries,
+		Platform:  platform,
 	}
 	// 1. Create Server
 	mux := http.NewServeMux()

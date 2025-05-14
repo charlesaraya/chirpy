@@ -18,6 +18,7 @@ const (
 	ErrorSomethingWentWrong  string = "Something went wrong"
 	ErrorInternalServerError string = "Internal Server Error"
 	MetricsTemplatePath      string = "./templates/metrics.html"
+	allowedPlatform          string = "dev"
 )
 
 var ProfaneWords = []string{"kerfuffle", "sharbert", "fornax"}
@@ -25,6 +26,7 @@ var ProfaneWords = []string{"kerfuffle", "sharbert", "fornax"}
 type ApiConfig struct {
 	ServerHits atomic.Int32
 	DBQueries  *database.Queries
+	Platform   string
 }
 
 func (cfg *ApiConfig) getHits() int32 {
@@ -133,8 +135,16 @@ func GetMetrics(apiCfg *ApiConfig, tmplPath string) http.HandlerFunc {
 
 func ResetMetrics(apiCfg *ApiConfig) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		res.WriteHeader(200)
-		apiCfg.resetHits()
+		if apiCfg.Platform == allowedPlatform {
+			apiCfg.resetHits()
+			if err := apiCfg.DBQueries.DeleteUsers(req.Context()); err != nil {
+				http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+				return
+			}
+			res.WriteHeader(http.StatusOK)
+			return
+		}
+		res.WriteHeader(http.StatusForbidden)
 	}
 }
 
