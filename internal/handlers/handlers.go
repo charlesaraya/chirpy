@@ -56,11 +56,11 @@ func (cfg *ApiConfig) resetHits() {
 	cfg.ServerHits = atomic.Int32{}
 }
 
-func GetHome(apiCfg *ApiConfig, name string, prefix string) http.HandlerFunc {
+func GetHomeHandler(apiCfg *ApiConfig, name string, prefix string) http.HandlerFunc {
 	return apiCfg.incHits(http.StripPrefix(prefix, http.FileServer(http.Dir(name))))
 }
 
-func ValidateChirp(res http.ResponseWriter, req *http.Request) {
+func ValidateChirpHandler(res http.ResponseWriter, req *http.Request) {
 	type reqPayload struct {
 		Body string `json:"body"`
 	}
@@ -125,12 +125,12 @@ func cleanProfanity(chirp string) string {
 	return chirp
 }
 
-func GetHealth(res http.ResponseWriter, req *http.Request) {
+func GetHealthHandler(res http.ResponseWriter, req *http.Request) {
 	res.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	res.Write([]byte(HealthOK))
 }
 
-func GetMetrics(apiCfg *ApiConfig, tmplPath string) http.HandlerFunc {
+func GetMetricsHandler(apiCfg *ApiConfig, tmplPath string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		rawTemplate, err := os.ReadFile(tmplPath)
 		if err != nil {
@@ -143,7 +143,7 @@ func GetMetrics(apiCfg *ApiConfig, tmplPath string) http.HandlerFunc {
 	}
 }
 
-func ResetMetrics(apiCfg *ApiConfig) http.HandlerFunc {
+func ResetMetricsHandler(apiCfg *ApiConfig) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		if apiCfg.Platform == allowedPlatform {
 			apiCfg.resetHits()

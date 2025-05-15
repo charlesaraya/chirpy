@@ -40,7 +40,7 @@ func main() {
 	}
 
 	// 2. Set up handlers
-	mux.Handle("/app/", handlers.GetHome(&apiCfg, ".", "/app"))
+	mux.Handle("/app/", handlers.GetHomeHandler(&apiCfg, ".", "/app"))
 
 	mux.HandleFunc("POST /api/users", handlers.CreateUserHandler(&apiCfg))
 
@@ -50,13 +50,13 @@ func main() {
 
 	mux.HandleFunc("GET /api/chirps/{chirpID}", handlers.GetSingleChirpHandler(&apiCfg))
 
-	mux.HandleFunc("POST /api/validate_chirp", handlers.ValidateChirp)
+	mux.HandleFunc("POST /api/validate_chirp", handlers.ValidateChirpHandler)
 
-	mux.HandleFunc("GET /api/healthz", handlers.GetHealth)
+	mux.HandleFunc("GET /api/healthz", handlers.GetHealthHandler)
 
-	mux.HandleFunc("GET /admin/metrics", handlers.GetMetrics(&apiCfg, handlers.MetricsTemplatePath))
+	mux.HandleFunc("GET /admin/metrics", handlers.GetMetricsHandler(&apiCfg, handlers.MetricsTemplatePath))
 
-	mux.HandleFunc("POST /admin/reset", handlers.ResetMetrics(&apiCfg))
+	mux.HandleFunc("POST /admin/reset", handlers.ResetMetricsHandler(&apiCfg))
 
 	// 3. Start server
 	server.ListenAndServe()
