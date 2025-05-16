@@ -55,7 +55,7 @@ func assertBodyContains(t *testing.T, rec *httptest.ResponseRecorder, expected s
 
 func TestHealthHandler(t *testing.T) {
 	t.Run("run health handler", func(t *testing.T) {
-		rec := executeRequest(t, GetHealth, "GET", "/health", nil)
+		rec := executeRequest(t, GetHealthHandler, "GET", "/health", nil)
 		assertStatus(t, rec, http.StatusOK)
 		assertBodyEqual(t, rec, HealthOK)
 	})
@@ -69,19 +69,19 @@ func TestMetricsHandler(t *testing.T) {
 		os.WriteFile(filepath.Join(tempDir, "index.html"), []byte("Ok"), 0664)
 		numHits := 100
 		for range numHits {
-			executeRequest(t, GetHome(cfg, tempDir, "/app"), "GET", "/app/", nil)
+			executeRequest(t, GetHomeHandler(cfg, tempDir, "/app"), "GET", "/app/", nil)
 		}
-		rec := executeRequest(t, GetMetrics(cfg, tmplPath), "GET", "/metrics", nil)
+		rec := executeRequest(t, GetMetricsHandler(cfg, tmplPath), "GET", "/metrics", nil)
 		assertStatus(t, rec, http.StatusOK)
 		assertContentType(t, rec, "text/html")
 		expected := fmt.Sprintf("Chirpy has been visited %d times!", numHits)
 		assertBodyContains(t, rec, expected)
 	})
 	t.Run("run reset metrics handler", func(t *testing.T) {
-		rec := executeRequest(t, ResetMetrics(cfg), "POST", "/reset", nil)
+		rec := executeRequest(t, ResetMetricsHandler(cfg), "POST", "/reset", nil)
 		assertStatus(t, rec, http.StatusOK)
 
-		rec = executeRequest(t, GetMetrics(cfg, tmplPath), "GET", "/metrics", nil)
+		rec = executeRequest(t, GetMetricsHandler(cfg, tmplPath), "GET", "/metrics", nil)
 		expected := fmt.Sprintf("Chirpy has been visited %d times!", 0)
 		assertBodyContains(t, rec, expected)
 	})
@@ -91,26 +91,26 @@ func TestValidateChirp(t *testing.T) {
 	t.Run("validate just right chirp", func(t *testing.T) {
 		validChirp := strings.Repeat("chirp! ", 20)
 		jsonBody := fmt.Sprintf(`{"body":"%s"}`, validChirp)
-		rec := executeRequest(t, ValidateChirp, "POST", "/validate_chirp", strings.NewReader(jsonBody))
+		rec := executeRequest(t, ValidateChirpHandler, "POST", "/validate_chirp", strings.NewReader(jsonBody))
 		assertStatus(t, rec, http.StatusOK)
 	})
 
 	t.Run("validate too long chirp", func(t *testing.T) {
 		invalidChirp := strings.Repeat("yada", 50)
 		jsonBody := fmt.Sprintf(`{"body":"%s"}`, invalidChirp)
-		rec := executeRequest(t, ValidateChirp, "POST", "/validate_chirp", strings.NewReader(jsonBody))
+		rec := executeRequest(t, ValidateChirpHandler, "POST", "/validate_chirp", strings.NewReader(jsonBody))
 		assertStatus(t, rec, http.StatusBadRequest)
 	})
 
 	t.Run("validate invalid chirp json", func(t *testing.T) {
 		jsonBody := `{"name":"Hello World!"}`
-		rec := executeRequest(t, ValidateChirp, "POST", "/validate_chirp", strings.NewReader(jsonBody))
+		rec := executeRequest(t, ValidateChirpHandler, "POST", "/validate_chirp", strings.NewReader(jsonBody))
 		assertStatus(t, rec, http.StatusBadRequest)
 	})
 
 	t.Run("validate empty chirp", func(t *testing.T) {
 		jsonBody := `{"body":""}`
-		rec := executeRequest(t, ValidateChirp, "POST", "/validate_chirp", strings.NewReader(jsonBody))
+		rec := executeRequest(t, ValidateChirpHandler, "POST", "/validate_chirp", strings.NewReader(jsonBody))
 		assertStatus(t, rec, http.StatusBadRequest)
 	})
 }
