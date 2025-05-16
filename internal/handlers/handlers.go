@@ -41,6 +41,18 @@ type chirpPayload struct {
 	Body      string `json:"body"`
 }
 
+type loginPayload struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type userPayload struct {
+	ID        string `json:"id"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+	Email     string `json:"email"`
+}
+
 func (cfg *ApiConfig) getHits() int32 {
 	hits := cfg.ServerHits.Load()
 	return hits
@@ -161,25 +173,18 @@ func ResetMetricsHandler(apiCfg *ApiConfig) http.HandlerFunc {
 
 func CreateUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		type reqPayload struct {
-			Email    string `json:"email"`
-			Password string `json:"password"`
-		}
-		type resPayload struct {
-			Id        string `json:"id"`
-			CreatedAt string `json:"created_at"`
-			UpdatedAt string `json:"updated_at"`
-			Email     string `json:"email"`
-		}
-
 		decoder := json.NewDecoder(req.Body)
-		params := reqPayload{}
+		params := loginPayload{}
 		if err := decoder.Decode(&params); err != nil {
 			http.Error(res, ErrorSomethingWentWrong, http.StatusBadRequest)
 			return
 		}
 		hashedPassword, err := auth.HashPassword(params.Password)
 		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		if err := auth.CheckPasswordHash(hashedPassword, params.Password); err != nil {
 			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 			return
 		}
@@ -192,8 +197,8 @@ func CreateUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 			return
 		}
-		resBody := resPayload{
-			Id:        user.ID.String(),
+		resBody := userPayload{
+			ID:        user.ID.String(),
 			CreatedAt: user.CreatedAt.String(),
 			UpdatedAt: user.UpdatedAt.String(),
 			Email:     user.Email,
@@ -204,6 +209,39 @@ func CreateUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 			return
 		}
 		res.WriteHeader(http.StatusCreated)
+		res.Header().Set("Content-Type", "application/json")
+		res.Write(data)
+	}
+}
+
+func LoginUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		decoder := json.NewDecoder(req.Body)
+		params := loginPayload{}
+		if err := decoder.Decode(&params); err != nil {
+			http.Error(res, ErrorSomethingWentWrong, http.StatusBadRequest)
+			return
+		}
+		user, err := apiCfg.DBQueries.GetUser(req.Context(), params.Email)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		if err := auth.CheckPasswordHash(user.HashedPassword, params.Password); err != nil {
+			http.Error(res, ErrorSomethingWentWrong, http.StatusUnauthorized)
+			return
+		}
+		payload := userPayload{
+			ID:        user.ID.String(),
+			CreatedAt: user.CreatedAt.Format(TimeFormat),
+			UpdatedAt: user.UpdatedAt.Format(TimeFormat),
+			Email:     user.Email,
+		}
+		data, err := json.Marshal(payload)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
 		res.Header().Set("Content-Type", "application/json")
 		res.Write(data)
 	}
