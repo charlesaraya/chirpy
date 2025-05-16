@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/charlesaraya/chirpy/internal/auth"
 	"github.com/charlesaraya/chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -161,7 +162,8 @@ func ResetMetricsHandler(apiCfg *ApiConfig) http.HandlerFunc {
 func CreateUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		type reqPayload struct {
-			Email string `json:"email"`
+			Email    string `json:"email"`
+			Password string `json:"password"`
 		}
 		type resPayload struct {
 			Id        string `json:"id"`
@@ -176,7 +178,16 @@ func CreateUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 			http.Error(res, ErrorSomethingWentWrong, http.StatusBadRequest)
 			return
 		}
-		user, err := apiCfg.DBQueries.CreateUser(req.Context(), params.Email)
+		hashedPassword, err := auth.HashPassword(params.Password)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		userParams := database.CreateUserParams{
+			Email:          params.Email,
+			HashedPassword: hashedPassword,
+		}
+		user, err := apiCfg.DBQueries.CreateUser(req.Context(), userParams)
 		if err != nil {
 			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 			return
