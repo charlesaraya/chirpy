@@ -15,16 +15,17 @@ import (
 )
 
 const (
-	HealthOK                    string        = "OK"
-	MaxChirpLen                 int           = 140
-	ErrorChirpTooLong           string        = "Chirp is too long"
-	ErrorSomethingWentWrong     string        = "Something went wrong"
-	ErrorInternalServerError    string        = "Internal Server Error"
-	ErrorResourceNotFound       string        = "Resource Not Found"
-	MetricsTemplatePath         string        = "./templates/metrics.html"
-	allowedPlatform             string        = "dev"
-	TimeFormat                  string        = "2006-01-02 15:04:05.000000"
-	MaxSessionDurationInSeconds time.Duration = time.Hour
+	HealthOK                 string        = "OK"
+	MaxChirpLen              int           = 140
+	ErrorChirpTooLong        string        = "Chirp is too long"
+	ErrorSomethingWentWrong  string        = "Something went wrong"
+	ErrorInternalServerError string        = "Internal Server Error"
+	ErrorResourceNotFound    string        = "Resource Not Found"
+	ErrorUnauthorized        string        = "Unauthorized"
+	MetricsTemplatePath      string        = "./templates/metrics.html"
+	allowedPlatform          string        = "dev"
+	TimeFormat               string        = "2006-01-02 15:04:05.000000"
+	MaxSessionDuration       time.Duration = time.Hour
 )
 
 var ProfaneWords = []string{"kerfuffle", "sharbert", "fornax"}
@@ -45,9 +46,9 @@ type chirpPayload struct {
 }
 
 type loginPayload struct {
-	Email                 string `json:"email"`
-	Password              string `json:"password"`
-	SessionExpirationTime int    `json:"expires_in_seconds"`
+	Email                 string        `json:"email"`
+	Password              string        `json:"password"`
+	SessionExpirationTime time.Duration `json:"expires_in_seconds"`
 }
 
 type userPayload struct {
@@ -236,9 +237,10 @@ func LoginUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 			http.Error(res, ErrorSomethingWentWrong, http.StatusUnauthorized)
 			return
 		}
-		sessionDuration := MaxSessionDurationInSeconds
-		if time.Duration(params.SessionExpirationTime) <= MaxSessionDurationInSeconds {
-			sessionDuration = time.Duration(params.SessionExpirationTime)
+		sessionDuration := MaxSessionDuration
+		if params.SessionExpirationTime <= MaxSessionDuration &&
+			params.SessionExpirationTime > time.Duration(0) {
+			sessionDuration = time.Duration(params.SessionExpirationTime) * time.Second
 		}
 		token, err := auth.MakeJWT(user.ID, apiCfg.TokenSecret, sessionDuration)
 		if err != nil {
@@ -265,8 +267,7 @@ func LoginUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 func CreateChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		type reqPayload struct {
-			UserID uuid.UUID `json:"user_id"`
-			Body   string    `json:"body"`
+			Body string `json:"body"`
 		}
 		params := reqPayload{}
 		decoder := json.NewDecoder(req.Body)
@@ -274,8 +275,18 @@ func CreateChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
 			http.Error(res, ErrorSomethingWentWrong, http.StatusBadRequest)
 			return
 		}
+		token, err := auth.GetBearerToken(req.Header)
+		if err != nil {
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		userUUID, err := auth.ValidateJWT(token, apiCfg.TokenSecret)
+		if err != nil {
+			http.Error(res, err.Error(), http.StatusUnauthorized)
+			return
+		}
 		chirpParams := database.CreateChirpParams{
-			UserID: uuid.UUID(params.UserID),
+			UserID: userUUID,
 			Body:   params.Body,
 		}
 		chirp, err := apiCfg.DBQueries.CreateChirp(req.Context(), chirpParams)

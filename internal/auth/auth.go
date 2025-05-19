@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -51,11 +52,11 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 		return []byte(tokenSecret), nil
 	})
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("error: signing token secret: %w", err)
+		return uuid.Nil, err
 	}
 	claims, ok := token.Claims.(*jwt.RegisteredClaims)
 	if !ok {
-		return uuid.Nil, fmt.Errorf("error: unknown claims type, cannot proceed: %w", err)
+		return uuid.Nil, fmt.Errorf("error: unknown claims type, cannot proceed")
 	}
 	expirationTime, err := claims.GetExpirationTime()
 	if err != nil {
@@ -80,5 +81,6 @@ func GetBearerToken(headers http.Header) (string, error) {
 	if tokenString == "" {
 		return "", fmt.Errorf("error: bearer doesn't exist")
 	}
+	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 	return tokenString, nil
 }
