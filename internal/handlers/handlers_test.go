@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,7 +11,20 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/charlesaraya/chirpy/internal/database"
+	_ "github.com/lib/pq"
 )
+
+func loadDB(t *testing.T) (*database.Queries, error) {
+	dbURL := "postgres://charlesaraya:@localhost:5432/chirpy?sslmode=disable"
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		t.Errorf("Error opening the database. got %s", err.Error())
+	}
+	dbQueries := database.New(db)
+	return dbQueries, nil
+}
 
 func executeRequest(t *testing.T, handler http.HandlerFunc, method, path string, body io.Reader) *httptest.ResponseRecorder {
 	t.Helper()
@@ -78,10 +92,15 @@ func TestMetricsHandler(t *testing.T) {
 		assertBodyContains(t, rec, expected)
 	})
 	t.Run("run reset metrics handler", func(t *testing.T) {
-		rec := executeRequest(t, ResetMetricsHandler(cfg), "POST", "/reset", nil)
+		dbQueries, _ := loadDB(t)
+		resetCfg := ApiConfig{
+			DBQueries: dbQueries,
+			Platform:  allowedPlatform,
+		}
+		rec := executeRequest(t, ResetMetricsHandler(&resetCfg), "POST", "/reset", nil)
 		assertStatus(t, rec, http.StatusOK)
 
-		rec = executeRequest(t, GetMetricsHandler(cfg, tmplPath), "GET", "/metrics", nil)
+		rec = executeRequest(t, GetMetricsHandler(&resetCfg, tmplPath), "GET", "/metrics", nil)
 		expected := fmt.Sprintf("Chirpy has been visited %d times!", 0)
 		assertBodyContains(t, rec, expected)
 	})
