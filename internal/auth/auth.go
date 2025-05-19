@@ -2,8 +2,15 @@ package auth
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+)
+
+const (
+	issuer string = "chirpy"
 )
 
 func HashPassword(password string) (string, error) {
@@ -20,4 +27,49 @@ func CheckPasswordHash(hash, password string) error {
 		return fmt.Errorf("error: password hash: %w", err)
 	}
 	return nil
+}
+
+func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
+	chirpyClaims := &jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		Issuer:    issuer,
+		Subject:   userID.String(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, chirpyClaims)
+	signedToken, err := token.SignedString([]byte(tokenSecret))
+	if err != nil {
+		return "", fmt.Errorf("error: signing token secret: %w", err)
+	}
+	return signedToken, err
+}
+
+func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(tokenSecret), nil
+	})
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("error: signing token secret: %w", err)
+	}
+	claims, ok := token.Claims.(*jwt.RegisteredClaims)
+	if !ok {
+		return uuid.Nil, fmt.Errorf("error: unknown claims type, cannot proceed: %w", err)
+	}
+	expirationTime, err := claims.GetExpirationTime()
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("error: getting experitation time: %w", err)
+	}
+	if expirationTime.Time.Before(time.Now()) {
+		return uuid.Nil, fmt.Errorf("error: token is expired: %w", err)
+	}
+	userID, err := claims.GetSubject()
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("error: getting subject: %w", err)
+	}
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("error: couldn't parse user id: %w", err)
+	}
+	return userUUID, nil
 }
