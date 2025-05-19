@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/charlesaraya/chirpy/internal/auth"
 	"github.com/charlesaraya/chirpy/internal/database"
@@ -14,23 +15,25 @@ import (
 )
 
 const (
-	HealthOK                 string = "OK"
-	MaxChirpLen              int    = 140
-	ErrorChirpTooLong        string = "Chirp is too long"
-	ErrorSomethingWentWrong  string = "Something went wrong"
-	ErrorInternalServerError string = "Internal Server Error"
-	ErrorResourceNotFound    string = "Resource Not Found"
-	MetricsTemplatePath      string = "./templates/metrics.html"
-	allowedPlatform          string = "dev"
-	TimeFormat               string = "2006-01-02 15:04:05.000000"
+	HealthOK                    string        = "OK"
+	MaxChirpLen                 int           = 140
+	ErrorChirpTooLong           string        = "Chirp is too long"
+	ErrorSomethingWentWrong     string        = "Something went wrong"
+	ErrorInternalServerError    string        = "Internal Server Error"
+	ErrorResourceNotFound       string        = "Resource Not Found"
+	MetricsTemplatePath         string        = "./templates/metrics.html"
+	allowedPlatform             string        = "dev"
+	TimeFormat                  string        = "2006-01-02 15:04:05.000000"
+	MaxSessionDurationInSeconds time.Duration = time.Hour
 )
 
 var ProfaneWords = []string{"kerfuffle", "sharbert", "fornax"}
 
 type ApiConfig struct {
-	ServerHits atomic.Int32
-	DBQueries  *database.Queries
-	Platform   string
+	ServerHits  atomic.Int32
+	DBQueries   *database.Queries
+	Platform    string
+	TokenSecret string
 }
 
 type chirpPayload struct {
@@ -42,8 +45,9 @@ type chirpPayload struct {
 }
 
 type loginPayload struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email                 string `json:"email"`
+	Password              string `json:"password"`
+	SessionExpirationTime int    `json:"expires_in_seconds"`
 }
 
 type userPayload struct {
@@ -51,6 +55,7 @@ type userPayload struct {
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 	Email     string `json:"email"`
+	Token     string `json:"token"`
 }
 
 func (cfg *ApiConfig) getHits() int32 {
@@ -231,11 +236,21 @@ func LoginUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 			http.Error(res, ErrorSomethingWentWrong, http.StatusUnauthorized)
 			return
 		}
+		sessionDuration := MaxSessionDurationInSeconds
+		if time.Duration(params.SessionExpirationTime) <= MaxSessionDurationInSeconds {
+			sessionDuration = time.Duration(params.SessionExpirationTime)
+		}
+		token, err := auth.MakeJWT(user.ID, apiCfg.TokenSecret, sessionDuration)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
 		payload := userPayload{
 			ID:        user.ID.String(),
 			CreatedAt: user.CreatedAt.Format(TimeFormat),
 			UpdatedAt: user.UpdatedAt.Format(TimeFormat),
 			Email:     user.Email,
+			Token:     token,
 		}
 		data, err := json.Marshal(payload)
 		if err != nil {
