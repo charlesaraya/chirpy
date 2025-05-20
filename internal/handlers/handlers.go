@@ -46,17 +46,21 @@ type chirpPayload struct {
 }
 
 type loginPayload struct {
-	Email                 string        `json:"email"`
-	Password              string        `json:"password"`
-	SessionExpirationTime time.Duration `json:"expires_in_seconds"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type userPayload struct {
-	ID        string `json:"id"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-	Email     string `json:"email"`
-	Token     string `json:"token"`
+	ID           string `json:"id"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
+	Email        string `json:"email"`
+	Token        string `json:"token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+type tokenPayload struct {
+	AccessToken string `json:"token"`
 }
 
 func (cfg *ApiConfig) getHits() int32 {
@@ -234,25 +238,32 @@ func LoginUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 			return
 		}
 		if err := auth.CheckPasswordHash(user.HashedPassword, params.Password); err != nil {
-			http.Error(res, ErrorSomethingWentWrong, http.StatusUnauthorized)
+			http.Error(res, ErrorUnauthorized, http.StatusUnauthorized)
 			return
 		}
-		sessionDuration := MaxSessionDuration
-		if params.SessionExpirationTime <= MaxSessionDuration &&
-			params.SessionExpirationTime > time.Duration(0) {
-			sessionDuration = time.Duration(params.SessionExpirationTime) * time.Second
+		token, err := auth.MakeJWT(user.ID, apiCfg.TokenSecret, MaxSessionDuration)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
 		}
-		token, err := auth.MakeJWT(user.ID, apiCfg.TokenSecret, sessionDuration)
+		refreshToken, _ := auth.MakeRefreshToken()
+		refereshTokensParams := database.CreateRefreshTokenParams{
+			Token:     refreshToken,
+			UserID:    user.ID,
+			ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
+		}
+		refreshTokenDB, err := apiCfg.DBQueries.CreateRefreshToken(req.Context(), refereshTokensParams)
 		if err != nil {
 			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 			return
 		}
 		payload := userPayload{
-			ID:        user.ID.String(),
-			CreatedAt: user.CreatedAt.Format(TimeFormat),
-			UpdatedAt: user.UpdatedAt.Format(TimeFormat),
-			Email:     user.Email,
-			Token:     token,
+			ID:           user.ID.String(),
+			CreatedAt:    user.CreatedAt.Format(TimeFormat),
+			UpdatedAt:    user.UpdatedAt.Format(TimeFormat),
+			Email:        user.Email,
+			Token:        token,
+			RefreshToken: refreshTokenDB.Token,
 		}
 		data, err := json.Marshal(payload)
 		if err != nil {
@@ -261,6 +272,51 @@ func LoginUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 		}
 		res.Header().Set("Content-Type", "application/json")
 		res.Write(data)
+	}
+}
+
+func RefreshTokenHandler(apiCfg *ApiConfig) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		token, err := auth.GetBearerToken(req.Header)
+		if err != nil {
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		refreshToken, err := apiCfg.DBQueries.GetRefreshToken(req.Context(), token)
+		if err != nil || refreshToken.ExpiresAt.Before(time.Now()) || refreshToken.RevokedAt.Valid {
+			http.Error(res, ErrorUnauthorized, http.StatusUnauthorized)
+			return
+		}
+		accessToken, err := auth.MakeJWT(refreshToken.UserID, apiCfg.TokenSecret, MaxSessionDuration)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		payload := tokenPayload{
+			AccessToken: accessToken,
+		}
+		data, err := json.Marshal(payload)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+		}
+		res.Header().Set("Content-Type", "application/json")
+		res.Write(data)
+	}
+}
+
+func RevokeTokenHandler(apiCfg *ApiConfig) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		token, err := auth.GetBearerToken(req.Header)
+		if err != nil {
+			http.Error(res, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		err = apiCfg.DBQueries.RevokeRefreshToken(req.Context(), token)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		res.WriteHeader(http.StatusNoContent)
 	}
 }
 

@@ -52,6 +52,10 @@ func main() {
 
 	mux.HandleFunc("GET /api/chirps/{chirpID}", handlers.GetSingleChirpHandler(&apiCfg))
 
+	mux.HandleFunc("POST /api/refresh", handlers.RefreshTokenHandler(&apiCfg))
+
+	mux.HandleFunc("POST /api/revoke", handlers.RevokeTokenHandler(&apiCfg))
+
 	mux.HandleFunc("POST /api/validate_chirp", handlers.ValidateChirpHandler)
 
 	mux.HandleFunc("GET /api/healthz", handlers.GetHealthHandler)
