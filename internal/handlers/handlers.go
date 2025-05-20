@@ -20,8 +20,9 @@ const (
 	ErrorChirpTooLong        string        = "Chirp is too long"
 	ErrorSomethingWentWrong  string        = "Something went wrong"
 	ErrorInternalServerError string        = "Internal Server Error"
-	ErrorResourceNotFound    string        = "Resource Not Found"
 	ErrorUnauthorized        string        = "Unauthorized"
+	ErrorForbidden           string        = "Forbidden"
+	ErrorNotFound            string        = "NotFound"
 	MetricsTemplatePath      string        = "./templates/metrics.html"
 	allowedPlatform          string        = "dev"
 	TimeFormat               string        = "2006-01-02 15:04:05.000000"
@@ -456,7 +457,7 @@ func GetSingleChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
 		}
 		chirp, err := apiCfg.DBQueries.GetSingleChirp(req.Context(), id)
 		if err != nil {
-			http.Error(res, ErrorResourceNotFound, http.StatusNotFound)
+			http.Error(res, ErrorNotFound, http.StatusNotFound)
 			return
 		}
 		payload := chirpPayload{
@@ -473,5 +474,49 @@ func GetSingleChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
 		}
 		res.Header().Set("Content-Type", "application/json")
 		res.Write(data)
+	}
+}
+
+func DeleteChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		token, err := auth.GetBearerToken(req.Header)
+		if err != nil {
+			http.Error(res, ErrorUnauthorized, http.StatusUnauthorized)
+			return
+		}
+		userUUID, err := auth.ValidateJWT(token, apiCfg.TokenSecret)
+		if err != nil {
+			http.Error(res, ErrorUnauthorized, http.StatusUnauthorized)
+			return
+		}
+		chirpID, err := uuid.Parse(req.PathValue("chirpID"))
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		params := database.DeleteChirpParams{
+			ID:     chirpID,
+			UserID: userUUID,
+		}
+		result, err := apiCfg.DBQueries.DeleteChirp(req.Context(), params)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			http.Error(res, ErrorForbidden, http.StatusForbidden)
+			return
+		}
+		if rowsAffected == 0 {
+			_, err := apiCfg.DBQueries.GetSingleChirp(req.Context(), chirpID)
+			if err != nil {
+				http.Error(res, ErrorNotFound, http.StatusNotFound)
+				return
+			}
+			http.Error(res, ErrorForbidden, http.StatusForbidden)
+			return
+		}
+		res.WriteHeader(http.StatusNoContent)
 	}
 }
