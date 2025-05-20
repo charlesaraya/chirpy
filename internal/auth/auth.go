@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -14,7 +15,10 @@ import (
 )
 
 const (
-	issuer string = "chirpy"
+	issuer               string = "chirpy"
+	ErrMissingBearer     string = "missing bearer in header"
+	ErrParseUserUUID     string = "failed to parse user UUID from subject"
+	ErrUnknownClaimsType string = "unknown claims type, cannot proceed"
 )
 
 func HashPassword(password string) (string, error) {
@@ -58,22 +62,22 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 	}
 	claims, ok := token.Claims.(*jwt.RegisteredClaims)
 	if !ok {
-		return uuid.Nil, fmt.Errorf("error: unknown claims type, cannot proceed")
+		return uuid.Nil, errors.New(ErrUnknownClaimsType)
 	}
 	expirationTime, err := claims.GetExpirationTime()
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("error: getting experitation time: %w", err)
+		return uuid.Nil, err
 	}
 	if expirationTime.Time.Before(time.Now()) {
-		return uuid.Nil, fmt.Errorf("error: token is expired: %w", err)
+		return uuid.Nil, jwt.ErrTokenExpired
 	}
 	userID, err := claims.GetSubject()
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("error: getting subject: %w", err)
+		return uuid.Nil, err
 	}
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("error: couldn't parse user id: %w", err)
+		return uuid.Nil, errors.New(ErrParseUserUUID)
 	}
 	return userUUID, nil
 }
@@ -81,7 +85,7 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 func GetBearerToken(headers http.Header) (string, error) {
 	tokenString := headers.Get("Authorization")
 	if tokenString == "" {
-		return "", fmt.Errorf("error: bearer doesn't exist")
+		return "", errors.New(ErrMissingBearer)
 	}
 	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
 	return tokenString, nil
