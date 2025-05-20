@@ -224,6 +224,59 @@ func CreateUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 	}
 }
 
+func UpdateUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		decoder := json.NewDecoder(req.Body)
+		params := loginPayload{}
+		if err := decoder.Decode(&params); err != nil {
+			http.Error(res, ErrorSomethingWentWrong, http.StatusBadRequest)
+			return
+		}
+		token, err := auth.GetBearerToken(req.Header)
+		if err != nil {
+			http.Error(res, ErrorUnauthorized, http.StatusUnauthorized)
+			return
+		}
+		userUUID, err := auth.ValidateJWT(token, apiCfg.TokenSecret)
+		if err != nil {
+			http.Error(res, ErrorUnauthorized, http.StatusUnauthorized)
+			return
+		}
+		hashedPassword, err := auth.HashPassword(params.Password)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		if err := auth.CheckPasswordHash(hashedPassword, params.Password); err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		userParams := database.UpdateUserParams{
+			Email:          params.Email,
+			HashedPassword: hashedPassword,
+			ID:             userUUID,
+		}
+		user, err := apiCfg.DBQueries.UpdateUser(req.Context(), userParams)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+		}
+		payload := userPayload{
+			ID:        user.ID.String(),
+			CreatedAt: user.CreatedAt.Format(TimeFormat),
+			UpdatedAt: user.UpdatedAt.Format(TimeFormat),
+			Email:     user.Email,
+			Token:     token,
+		}
+		data, err := json.Marshal(payload)
+		if err != nil {
+			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+			return
+		}
+		res.Header().Add("Content-Type", "application/json")
+		res.Write(data)
+	}
+}
+
 func LoginUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		decoder := json.NewDecoder(req.Body)
