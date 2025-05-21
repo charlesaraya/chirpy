@@ -393,10 +393,26 @@ func CreateChirpHandler(apiCfg *ApiConfig) http.HandlerFunc {
 
 func GetChirpsHandler(apiCfg *ApiConfig) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		chirps, err := apiCfg.DBQueries.GetChirps(req.Context())
-		if err != nil {
-			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
-			return
+		var chirps []database.Chirp
+		var err error
+		authorID := req.URL.Query().Get("author_id")
+		if authorID != "" {
+			userUUID, err := uuid.Parse(authorID)
+			if err != nil {
+				http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+				return
+			}
+			chirps, err = apiCfg.DBQueries.GetChirpsFromUser(req.Context(), userUUID)
+			if err != nil {
+				http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+				return
+			}
+		} else {
+			chirps, err = apiCfg.DBQueries.GetChirps(req.Context())
+			if err != nil {
+				http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
+				return
+			}
 		}
 		payload := make([]chirpPayload, len(chirps))
 		for i, chirp := range chirps {
