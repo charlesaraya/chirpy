@@ -31,6 +31,7 @@ func main() {
 		DBQueries:   dbQueries,
 		Platform:    os.Getenv("PLATFORM"),
 		TokenSecret: os.Getenv("TOKEN_SECRET"),
+		PolkaApiKey: os.Getenv("POLKA_API_KEY"),
 	}
 	// 1. Create Server
 	mux := http.NewServeMux()
@@ -67,6 +68,9 @@ func main() {
 	mux.HandleFunc("GET /admin/metrics", api.GetMetricsHandler(&apiCfg, api.MetricsTemplatePath))
 
 	mux.HandleFunc("POST /admin/reset", api.ResetMetricsHandler(&apiCfg))
+
+	// Webhooks
+	mux.HandleFunc("POST /api/polka/webhooks", api.PolkaWebhookHandler(&apiCfg))
 
 	// 3. Start server
 	server.ListenAndServe()

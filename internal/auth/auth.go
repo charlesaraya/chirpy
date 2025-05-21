@@ -17,6 +17,7 @@ import (
 const (
 	issuer               string = "chirpy"
 	ErrMissingBearer     string = "missing bearer in header"
+	ErrMissingApiKey     string = "missing apikey in header"
 	ErrParseUserUUID     string = "failed to parse user UUID from subject"
 	ErrUnknownClaimsType string = "unknown claims type, cannot proceed"
 )
@@ -95,4 +96,13 @@ func MakeRefreshToken() (string, error) {
 	key := make([]byte, 32)
 	rand.Read(key)
 	return hex.EncodeToString(key), nil
+}
+
+func GetApiKey(headers http.Header) (string, error) {
+	apiKey := headers.Get("Authorization")
+	if apiKey == "" {
+		return "", errors.New(ErrMissingApiKey)
+	}
+	apiKey = strings.TrimPrefix(apiKey, "ApiKey ")
+	return apiKey, nil
 }

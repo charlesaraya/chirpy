@@ -43,15 +43,6 @@ type loginPayload struct {
 	Password string `json:"password"`
 }
 
-type userPayload struct {
-	ID           string `json:"id"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
-	Email        string `json:"email"`
-	Token        string `json:"token"`
-	RefreshToken string `json:"refresh_token"`
-}
-
 type tokenPayload struct {
 	AccessToken string `json:"token"`
 }
@@ -184,11 +175,12 @@ func CreateUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 			return
 		}
-		resBody := userPayload{
-			ID:        user.ID.String(),
-			CreatedAt: user.CreatedAt.String(),
-			UpdatedAt: user.UpdatedAt.String(),
-			Email:     user.Email,
+		resBody := UserPayload{
+			ID:          user.ID.String(),
+			CreatedAt:   user.CreatedAt.String(),
+			UpdatedAt:   user.UpdatedAt.String(),
+			Email:       user.Email,
+			IsChirpyRed: user.IsChirpyRed,
 		}
 		data, err := json.Marshal(resBody)
 		if err != nil {
@@ -237,12 +229,13 @@ func UpdateUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 		if err != nil {
 			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 		}
-		payload := userPayload{
-			ID:        user.ID.String(),
-			CreatedAt: user.CreatedAt.Format(TimeFormat),
-			UpdatedAt: user.UpdatedAt.Format(TimeFormat),
-			Email:     user.Email,
-			Token:     token,
+		payload := UserPayload{
+			ID:          user.ID.String(),
+			CreatedAt:   user.CreatedAt.Format(TimeFormat),
+			UpdatedAt:   user.UpdatedAt.Format(TimeFormat),
+			Email:       user.Email,
+			IsChirpyRed: user.IsChirpyRed,
+			Token:       token,
 		}
 		data, err := json.Marshal(payload)
 		if err != nil {
@@ -287,11 +280,12 @@ func LoginUserHandler(apiCfg *ApiConfig) http.HandlerFunc {
 			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 			return
 		}
-		payload := userPayload{
+		payload := UserPayload{
 			ID:           user.ID.String(),
 			CreatedAt:    user.CreatedAt.Format(TimeFormat),
 			UpdatedAt:    user.UpdatedAt.Format(TimeFormat),
 			Email:        user.Email,
+			IsChirpyRed:  user.IsChirpyRed,
 			Token:        token,
 			RefreshToken: refreshTokenDB.Token,
 		}
