@@ -14,16 +14,6 @@ import (
 
 const testSecret = "testsecret"
 
-func generateToken(t *testing.T, secret string, claims jwt.RegisteredClaims) string {
-	t.Helper()
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString([]byte(secret))
-	if err != nil {
-		t.Fatalf("failed to sign token: %v", err)
-	}
-	return tokenString
-}
-
 func TestJWTs(t *testing.T) {
 	validUUID := uuid.New()
 

@@ -16,6 +16,7 @@ import (
 )
 
 func loadDB(t *testing.T) (*database.Queries, error) {
+	t.Helper()
 	dbURL := "postgres://charlesaraya:@localhost:5432/chirpy?sslmode=disable"
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
