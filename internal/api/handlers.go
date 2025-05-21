@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -413,6 +414,12 @@ func GetChirpsHandler(apiCfg *ApiConfig) http.HandlerFunc {
 				http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 				return
 			}
+		}
+		sortType := req.URL.Query().Get("sort")
+		if sortType == "desc" {
+			sort.Slice(chirps, func(i, j int) bool {
+				return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+			})
 		}
 		payload := make([]chirpPayload, len(chirps))
 		for i, chirp := range chirps {
