@@ -1,10 +1,16 @@
 package api
 
 import (
+	"database/sql"
+	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"sync/atomic"
 
 	"github.com/charlesaraya/chirpy/internal/database"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 type ApiConfig struct {
@@ -29,6 +35,27 @@ func (cfg *ApiConfig) IncHits(next http.Handler) http.HandlerFunc {
 
 func (cfg *ApiConfig) ResetHits() {
 	cfg.ServerHits = atomic.Int32{}
+}
+
+func Load() (*ApiConfig, error) {
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Print("Error loading .env file")
+	}
+	dbURL := os.Getenv("DB_URL")
+
+	// 0. Open DB connection
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		return nil, errors.New("error opening the database")
+	}
+
+	return &ApiConfig{
+		DBQueries:   database.New(db),
+		Platform:    os.Getenv("PLATFORM"),
+		TokenSecret: os.Getenv("TOKEN_SECRET"),
+		PolkaApiKey: os.Getenv("POLKA_API_KEY"),
+	}, nil
 }
 
 type UserPayload struct {
