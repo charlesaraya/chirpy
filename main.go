@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/charlesaraya/chirpy/internal/api"
 	"github.com/charlesaraya/chirpy/internal/database"
-	"github.com/charlesaraya/chirpy/internal/handlers"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
@@ -27,7 +27,7 @@ func main() {
 	}
 	dbQueries := database.New(db)
 
-	apiCfg := handlers.ApiConfig{
+	apiCfg := api.ApiConfig{
 		DBQueries:   dbQueries,
 		Platform:    os.Getenv("PLATFORM"),
 		TokenSecret: os.Getenv("TOKEN_SECRET"),
@@ -40,33 +40,33 @@ func main() {
 	}
 
 	// 2. Set up handlers
-	mux.Handle("/app/", handlers.GetHomeHandler(&apiCfg, ".", "/app"))
+	mux.Handle("/app/", api.GetHomeHandler(&apiCfg, ".", "/app"))
 
-	mux.HandleFunc("POST /api/users", handlers.CreateUserHandler(&apiCfg))
+	mux.HandleFunc("POST /api/users", api.CreateUserHandler(&apiCfg))
 
-	mux.HandleFunc("PUT /api/users", handlers.UpdateUserHandler(&apiCfg))
+	mux.HandleFunc("PUT /api/users", api.UpdateUserHandler(&apiCfg))
 
-	mux.HandleFunc("POST /api/login", handlers.LoginUserHandler(&apiCfg))
+	mux.HandleFunc("POST /api/login", api.LoginUserHandler(&apiCfg))
 
-	mux.HandleFunc("POST /api/chirps", handlers.CreateChirpHandler(&apiCfg))
+	mux.HandleFunc("POST /api/chirps", api.CreateChirpHandler(&apiCfg))
 
-	mux.HandleFunc("GET /api/chirps", handlers.GetChirpsHandler(&apiCfg))
+	mux.HandleFunc("GET /api/chirps", api.GetChirpsHandler(&apiCfg))
 
-	mux.HandleFunc("GET /api/chirps/{chirpID}", handlers.GetSingleChirpHandler(&apiCfg))
+	mux.HandleFunc("GET /api/chirps/{chirpID}", api.GetSingleChirpHandler(&apiCfg))
 
-	mux.HandleFunc("DELETE /api/chirps/{chirpID}", handlers.DeleteChirpHandler(&apiCfg))
+	mux.HandleFunc("DELETE /api/chirps/{chirpID}", api.DeleteChirpHandler(&apiCfg))
 
-	mux.HandleFunc("POST /api/refresh", handlers.RefreshTokenHandler(&apiCfg))
+	mux.HandleFunc("POST /api/refresh", api.RefreshTokenHandler(&apiCfg))
 
-	mux.HandleFunc("POST /api/revoke", handlers.RevokeTokenHandler(&apiCfg))
+	mux.HandleFunc("POST /api/revoke", api.RevokeTokenHandler(&apiCfg))
 
-	mux.HandleFunc("POST /api/validate_chirp", handlers.ValidateChirpHandler)
+	mux.HandleFunc("POST /api/validate_chirp", api.ValidateChirpHandler)
 
-	mux.HandleFunc("GET /api/healthz", handlers.GetHealthHandler)
+	mux.HandleFunc("GET /api/healthz", api.GetHealthHandler)
 
-	mux.HandleFunc("GET /admin/metrics", handlers.GetMetricsHandler(&apiCfg, handlers.MetricsTemplatePath))
+	mux.HandleFunc("GET /admin/metrics", api.GetMetricsHandler(&apiCfg, api.MetricsTemplatePath))
 
-	mux.HandleFunc("POST /admin/reset", handlers.ResetMetricsHandler(&apiCfg))
+	mux.HandleFunc("POST /admin/reset", api.ResetMetricsHandler(&apiCfg))
 
 	// 3. Start server
 	server.ListenAndServe()

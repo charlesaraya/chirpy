@@ -1,4 +1,4 @@
-package handlers
+package api
 
 import (
 	"encoding/json"
@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/charlesaraya/chirpy/internal/auth"
@@ -30,13 +29,6 @@ const (
 )
 
 var ProfaneWords = []string{"kerfuffle", "sharbert", "fornax"}
-
-type ApiConfig struct {
-	ServerHits  atomic.Int32
-	DBQueries   *database.Queries
-	Platform    string
-	TokenSecret string
-}
 
 type chirpPayload struct {
 	ID        string `json:"id"`
@@ -64,24 +56,8 @@ type tokenPayload struct {
 	AccessToken string `json:"token"`
 }
 
-func (cfg *ApiConfig) getHits() int32 {
-	hits := cfg.ServerHits.Load()
-	return hits
-}
-
-func (cfg *ApiConfig) incHits(next http.Handler) http.HandlerFunc {
-	return func(res http.ResponseWriter, req *http.Request) {
-		cfg.ServerHits.Add(1)
-		next.ServeHTTP(res, req)
-	}
-}
-
-func (cfg *ApiConfig) resetHits() {
-	cfg.ServerHits = atomic.Int32{}
-}
-
 func GetHomeHandler(apiCfg *ApiConfig, name string, prefix string) http.HandlerFunc {
-	return apiCfg.incHits(http.StripPrefix(prefix, http.FileServer(http.Dir(name))))
+	return apiCfg.IncHits(http.StripPrefix(prefix, http.FileServer(http.Dir(name))))
 }
 
 func ValidateChirpHandler(res http.ResponseWriter, req *http.Request) {
@@ -161,7 +137,7 @@ func GetMetricsHandler(apiCfg *ApiConfig, tmplPath string) http.HandlerFunc {
 			http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 			return
 		}
-		msg := fmt.Sprintf(string(rawTemplate), apiCfg.getHits())
+		msg := fmt.Sprintf(string(rawTemplate), apiCfg.GetHits())
 		res.Header().Set("Content-Type", "text/html; charset=utf-8")
 		res.Write([]byte(msg))
 	}
@@ -170,7 +146,7 @@ func GetMetricsHandler(apiCfg *ApiConfig, tmplPath string) http.HandlerFunc {
 func ResetMetricsHandler(apiCfg *ApiConfig) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		if apiCfg.Platform == allowedPlatform {
-			apiCfg.resetHits()
+			apiCfg.ResetHits()
 			if err := apiCfg.DBQueries.DeleteUsers(req.Context()); err != nil {
 				http.Error(res, ErrorInternalServerError, http.StatusInternalServerError)
 				return

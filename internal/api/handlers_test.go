@@ -1,5 +1,4 @@
-// main_test.go
-package handlers
+package api
 
 import (
 	"database/sql"
